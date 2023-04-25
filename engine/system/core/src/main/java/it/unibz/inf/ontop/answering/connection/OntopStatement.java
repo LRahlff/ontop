@@ -10,6 +10,8 @@ import it.unibz.inf.ontop.query.resultset.TupleResultSet;
 import it.unibz.inf.ontop.exception.*;
 import it.unibz.inf.ontop.iq.IQ;
 
+import java.sql.SQLException;
+
 /**
  * OBDAStatement specific to Ontop.
  *
@@ -36,4 +38,5 @@ public interface OntopStatement extends OBDAStatement {
     BooleanResultSet executeBooleanQuery(IQ executableQuery, QueryLogger queryLogger)
             throws OntopQueryEvaluationException;
 
+//    void executeSQL(String s) throws SQLException;
 }

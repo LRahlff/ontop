@@ -179,6 +179,10 @@ public class SQLQuestStatement extends QuestStatement {
         }
     }
 
+    public void executeSQL(String sql) throws SQLException {
+        sqlStatement.execute(sql);
+    }
+
     @Override
     protected TupleResultSet executeSelectQuery(IQ executableQuery, QueryLogger queryLogger,
                                                 boolean shouldAlsoCloseStatement)

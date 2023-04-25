@@ -39,10 +39,11 @@ ENV PATH="${JAVA_HOME}/bin:/opt/ontop:${PATH}"
 COPY --from=jre-builder /jre ${JAVA_HOME}
 WORKDIR /opt/ontop
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget netcat jattach && \
+    apt-get install -y --no-install-recommends wget netcat jattach python3 python3-pip && \
     rm -rf /var/cache/apt/archives /var/lib/apt/lists /var/log/dpkg.log /var/log/lastlog /var/log/faillog && \
     groupadd -r ontop && \
     useradd -r -g ontop -d /opt/ontop -s /sbin/nologin -c "Ontop unprivileged user" ontop
+RUN pip install antlr4-python3-runtime
 LABEL \
     org.opencontainers.image.url="https://github.com/ontop/ontop/tree/version5/client/docker" \
     org.opencontainers.image.documentation="https://ontop-vkg.org/guide/cli.html" \

@@ -165,6 +165,10 @@
             <groupId>com.moandjiezana.toml</groupId>
             <artifactId>toml4j</artifactId>
         </dependency>
+        <dependency>
+            <groupId>it.unibz.inf.ontop</groupId>
+            <artifactId>ontop-system-sql-core</artifactId>
+        </dependency>
     </dependencies>
 
 </project>
