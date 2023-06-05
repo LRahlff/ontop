@@ -285,4 +285,8 @@ public class SQLQuestStatement extends QuestStatement {
                 .orElseThrow(() -> new MinorOntopInternalBugException(
                         "The \"executable\" query is not starting with a construction node\n" + executableQuery));
     }
+
+    public void executeSQL(String sql) throws SQLException {
+        sqlStatement.execute(sql);
+    }
 }

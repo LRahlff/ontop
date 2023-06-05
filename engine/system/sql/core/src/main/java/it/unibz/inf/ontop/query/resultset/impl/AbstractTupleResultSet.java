@@ -85,10 +85,12 @@ public abstract class AbstractTupleResultSet implements TupleResultSet {
             lastCalledIsHasNext = true;
             try {
                 // Moves cursor one result ahead
+                System.out.println(rowCount);
                 foundNextElement = moveCursor();
                 if (foundNextElement)
                     rowCount++;
             } catch (Exception e) {
+                System.out.println("Error: " + e);
                 throw buildConnectionException(e);
             }
         }
@@ -101,6 +103,7 @@ public abstract class AbstractTupleResultSet implements TupleResultSet {
 
     /* This method can be overwritten to ensure distinct rows */
     protected boolean moveCursor() throws SQLException, OntopConnectionException {
+        System.out.println(rs);
         return rs.next();
     }
 
