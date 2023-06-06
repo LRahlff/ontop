@@ -48,7 +48,7 @@ public class OntopTupleQuery extends AbstractOntopQuery<ParsedTupleQuery> implem
 				long python_start = System.currentTimeMillis();
 				String lastline = "";
 				try{
-					ProcessBuilder pb = new ProcessBuilder("python3","../python-addon/main.py", getQueryString());
+					ProcessBuilder pb = new ProcessBuilder("/opt/venv/bin/python3","../python-addon/main.py", getQueryString());
 					Process p = pb.start();
 					BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()));
 					String line;

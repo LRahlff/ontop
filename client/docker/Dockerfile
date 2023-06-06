@@ -36,14 +36,15 @@ RUN ${JAVA_HOME}/bin/jlink \
 FROM ubuntu:jammy AS ontop-base-image
 ENV JAVA_HOME="/opt/java/openjdk"
 ENV PATH="${JAVA_HOME}/bin:/opt/ontop:${PATH}"
+ENV VENV_PATH="/opt/venv"
 COPY --from=jre-builder /jre ${JAVA_HOME}
 WORKDIR /opt/ontop
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget netcat jattach python3 python3-pip && \
+    apt-get install -y --no-install-recommends wget netcat jattach python3 python3-venv && \
     rm -rf /var/cache/apt/archives /var/lib/apt/lists /var/log/dpkg.log /var/log/lastlog /var/log/faillog && \
     groupadd -r ontop && \
     useradd -r -g ontop -d /opt/ontop -s /sbin/nologin -c "Ontop unprivileged user" ontop
-RUN pip install antlr4-python3-runtime
+RUN python3 -m venv ${VENV_PATH} && ${VENV_PATH}/bin/python3 -m ensurepip --upgrade && ${VENV_PATH}/bin/python3 -m pip install antlr4-python3-runtime
 LABEL \
     org.opencontainers.image.url="https://github.com/ontop/ontop/tree/version5/client/docker" \
     org.opencontainers.image.documentation="https://ontop-vkg.org/guide/cli.html" \
