@@ -38,6 +38,8 @@ public class OntopTupleQuery extends AbstractOntopQuery<ParsedTupleQuery> implem
 
 		try {
 			OntopStatement stm = conn.createStatement();
+			conn.setAutoCommit(false);
+			conn.rollBack();
 			if (queryTimeout > 0)
 				stm.setQueryTimeout(queryTimeout);
 			TupleResultSet res;
@@ -65,7 +67,6 @@ public class OntopTupleQuery extends AbstractOntopQuery<ParsedTupleQuery> implem
 				}
 				long prepare_start = System.currentTimeMillis();
 
-				conn.setAutoCommit(false);
 				SQLQuestStatement stmt = null;
 				if (stm instanceof SQLQuestStatement && lastline.length() > 0) {
 					String command = lastline.replaceAll("'", "''");
@@ -93,7 +94,7 @@ public class OntopTupleQuery extends AbstractOntopQuery<ParsedTupleQuery> implem
 				SelectQuery inputQuery = factory.createSelectQuery(getQueryString(), getParsedQuery(), bindings);
 				res = stm.execute(inputQuery, getHttpHeaders());
 
-				conn.commit();
+//				conn.commit();
 				long execute_end = System.currentTimeMillis();
 				System.out.println("Time for getting prepare request: " + (prepare_start-python_start)/1000L + " , execute prepare request: " + (execute_start-prepare_start)/1000L + " , getting results: " + (execute_end-execute_start)/1000L);
 			}
