@@ -80,4 +80,20 @@ public class BindWithFunctionsAthenaTest extends AbstractBindTestWithFunctions {
         super.testHashSHA384();
     }
 
+    @Disabled("Currently Trino does not support DATE_TRUNC for the type `DECADE`")
+    @Test
+    @Override
+    public void testDateTruncGroupBy() {
+        super.testDateTruncGroupBy();
+    }
+
+    @Override
+    protected ImmutableSet<String> getSimpleDateTrunkExpectedValues() {
+        return ImmutableSet.of("\"1970-01-01T00:00:00.000Z\"^^xsd:dateTime", "\"2011-01-01T00:00:00.000Z\"^^xsd:dateTime", "\"2014-01-01T00:00:00.000Z\"^^xsd:dateTime", "\"2015-01-01T00:00:00.000Z\"^^xsd:dateTime");
+    }
+
+    @Override
+    protected ImmutableSet<String> getStatisticalAttributesExpectedResults() {
+        return ImmutableSet.of("\"215.340000000000000000\"^^xsd:decimal");
+    }
 }

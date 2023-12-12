@@ -85,6 +85,23 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     private DBFunctionSymbol minutesFunctionSymbol;
     // Created in init()
     private DBFunctionSymbol secondsFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol weekFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol quarterFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol decadeFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol centuryFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol millenniumFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol millisecondsFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol microsecondsFunctionSymbol;
+    //Created in init
+    private DBFunctionSymbol dateTruncFunctionSymbol;
+    //Created in init
     // Created in init()
     private DBFunctionSymbol tzFunctionSymbol;
 
@@ -209,7 +226,10 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
      */
     private final Table<DBTermType, DBTermType, DBTypeConversionFunctionSymbol> otherSimpleCastTable;
 
+    // Output type
     private final Table<String, DBTermType, DBMathBinaryOperator> binaryMathTable;
+    private final Table<String, ImmutableList<DBTermType>, DBMathBinaryOperator> binaryMathTableWithInputType;
+
     private final Map<String, DBMathBinaryOperator> untypedBinaryMathMap;
 
     /**
@@ -301,9 +321,14 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
 
     private final Map<DBTermType, DBFunctionSymbol> distinctAvgMap;
     private final Map<DBTermType, DBFunctionSymbol> regularAvgMap;
+    private final Map<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> distinctStdevMap;
+    private final Map<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> regularStdevMap;
+    private final Map<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> distinctVarianceMap;
+    private final Map<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> regularVarianceMap;
 
     private final Map<DBTermType, DBFunctionSymbol> minMap;
     private final Map<DBTermType, DBFunctionSymbol> maxMap;
+    private final Map<DBTermType, DBFunctionSymbol> sampleMap;
 
     // NB: Multi-threading safety is NOT a concern here
     // (we don't create fresh bnode templates for a SPARQL query)
@@ -327,6 +352,7 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
 
         // NB: in terms of design, we prefer avoiding using tables as they are not thread-safe
         this.binaryMathTable = HashBasedTable.create();
+        this.binaryMathTableWithInputType = HashBasedTable.create();
         this.untypedFunctionTable = HashBasedTable.create();
         this.notPredefinedBooleanFunctionTable = HashBasedTable.create();
 
@@ -367,8 +393,15 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
         this.distinctAvgMap = new ConcurrentHashMap<>();
         this.regularAvgMap = new ConcurrentHashMap<>();
 
+        this.distinctStdevMap = new ConcurrentHashMap<>();
+        this.regularStdevMap = new ConcurrentHashMap<>();
+
+        this.distinctVarianceMap = new ConcurrentHashMap<>();
+        this.regularVarianceMap = new ConcurrentHashMap<>();
+
         this.minMap = new ConcurrentHashMap<>();
         this.maxMap = new ConcurrentHashMap<>();
+        this.sampleMap = new ConcurrentHashMap<>();
 
         this.typeNullMap = new ConcurrentHashMap<>();
 
@@ -427,6 +460,14 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
         hoursFunctionSymbol = createHoursFunctionSymbol();
         minutesFunctionSymbol = createMinutesFunctionSymbol();
         secondsFunctionSymbol = createSecondsFunctionSymbol();
+        weekFunctionSymbol = createWeekFunctionSymbol();
+        quarterFunctionSymbol = createQuarterFunctionSymbol();
+        decadeFunctionSymbol = createDecadeFunctionSymbol();
+        centuryFunctionSymbol = createCenturyFunctionSymbol();
+        millenniumFunctionSymbol = createMillenniumFunctionSymbol();
+        millisecondsFunctionSymbol = createMillisecondsFunctionSymbol();
+        microsecondsFunctionSymbol = createMicrosecondsFunctionSymbol();
+        dateTruncFunctionSymbol = createDateTruncFunctionSymbol();
         tzFunctionSymbol = createTzFunctionSymbol();
 
         weeksBetweenFromDateTimeFunctionSymbol = createWeeksBetweenFromDateTimeFunctionSymbol();
@@ -886,6 +927,23 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     }
 
     @Override
+    public DBMathBinaryOperator getDBMathBinaryOperator(String dbMathOperatorName, DBTermType arg1Type, DBTermType arg2Type) {
+        ImmutableList<DBTermType> types = ImmutableList.of(arg1Type, arg2Type);
+
+        // Mutable tables are not thread-safe
+        synchronized (binaryMathTableWithInputType) {
+            DBMathBinaryOperator existingOperator = binaryMathTableWithInputType.get(dbMathOperatorName, types);
+            if (existingOperator != null) {
+                return existingOperator;
+            }
+
+            DBMathBinaryOperator newOperator = createDBBinaryMathOperator(dbMathOperatorName, arg1Type, arg2Type);
+            binaryMathTableWithInputType.put(dbMathOperatorName, types, newOperator);
+            return newOperator;
+        }
+    }
+
+    @Override
     public DBMathBinaryOperator getUntypedDBMathBinaryOperator(String dbMathOperatorName) {
         DBMathBinaryOperator existingOperator = untypedBinaryMathMap.get(dbMathOperatorName);
         if (existingOperator != null) {
@@ -970,6 +1028,46 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     @Override
     public DBFunctionSymbol getDBHours() {
         return hoursFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBWeek() {
+        return weekFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBQuarter() {
+        return quarterFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBCentury() {
+        return centuryFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBDecade() {
+        return decadeFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBMillennium() {
+        return millenniumFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBMilliseconds() {
+        return millisecondsFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBMicroseconds() {
+        return microsecondsFunctionSymbol;
+    }
+
+    @Override
+    public DBFunctionSymbol getDBDateTrunc(String datePart) {
+        return dateTruncFunctionSymbol;
     }
 
     @Override
@@ -1097,6 +1195,24 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     }
 
     @Override
+    public DBFunctionSymbol getNullIgnoringDBStdev(DBTermType dbType, boolean isPop, boolean isDistinct) {
+        Function<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> creationFct = entry -> createDBStdev(dbType, isPop, isDistinct);
+
+        return isDistinct
+                ? distinctStdevMap.computeIfAbsent(Maps.immutableEntry(dbType, isPop), creationFct)
+                : regularStdevMap.computeIfAbsent(Maps.immutableEntry(dbType, isPop), creationFct);
+    }
+
+    @Override
+    public DBFunctionSymbol getNullIgnoringDBVariance(DBTermType dbType, boolean isPop, boolean isDistinct) {
+        Function<Map.Entry<DBTermType, Boolean>, DBFunctionSymbol> creationFct = entry -> createDBVariance(dbType, isPop, isDistinct);
+
+        return isDistinct
+                ? distinctVarianceMap.computeIfAbsent(Maps.immutableEntry(dbType, isPop), creationFct)
+                : regularVarianceMap.computeIfAbsent(Maps.immutableEntry(dbType, isPop), creationFct);
+    }
+
+    @Override
     public DBFunctionSymbol getDBMin(DBTermType dbType) {
         return minMap.computeIfAbsent(dbType, this::createDBMin);
     }
@@ -1104,6 +1220,11 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     @Override
     public DBFunctionSymbol getDBMax(DBTermType dbType) {
         return maxMap.computeIfAbsent(dbType, this::createDBMax);
+    }
+
+    @Override
+    public DBFunctionSymbol getDBSample(DBTermType dbType) {
+        return sampleMap.computeIfAbsent(dbType, this::createDBSample);
     }
 
     @Override
@@ -1208,8 +1329,12 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     protected abstract DBFunctionSymbol createDBCount(boolean isUnary, boolean isDistinct);
     protected abstract DBFunctionSymbol createDBSum(DBTermType termType, boolean isDistinct);
     protected abstract DBFunctionSymbol createDBAvg(DBTermType termType, boolean isDistinct);
+    protected abstract DBFunctionSymbol createDBStdev(DBTermType termType, boolean isPop, boolean isDistinct);
+    protected abstract DBFunctionSymbol createDBVariance(DBTermType termType, boolean isPop, boolean isDistinct);
     protected abstract DBFunctionSymbol createDBMin(DBTermType termType);
     protected abstract DBFunctionSymbol createDBMax(DBTermType termType);
+
+    protected abstract DBFunctionSymbol createDBSample(DBTermType termType);
 
     protected DBFunctionSymbol createDBGroupConcat(DBTermType dbStringType, boolean isDistinct) {
         return new NullIgnoringDBGroupConcatFunctionSymbol(dbStringType, isDistinct,
@@ -1267,6 +1392,25 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
                 return createSubtractOperator(dbNumericType);
             default:
                 throw new UnsupportedOperationException("The math operator " + dbMathOperatorName + " is not supported");
+        }
+    }
+
+    protected DBMathBinaryOperator createDBBinaryMathOperator(String dbMathOperatorName, DBTermType arg1Type, DBTermType arg2Type)
+            throws UnsupportedOperationException {
+        DBTermType inferOutputType = inferOutputTypeMathOperator(dbMathOperatorName, arg1Type, arg2Type);
+        return createDBBinaryMathOperator(dbMathOperatorName, inferOutputType);
+    }
+
+    protected DBTermType inferOutputTypeMathOperator(String dbMathOperatorName, DBTermType arg1Type, DBTermType arg2Type) {
+        if (arg1Type.getCategory().equals(arg2Type.getCategory()))
+            return arg1Type;
+        switch (arg1Type.getCategory()) {
+            case INTEGER:
+                return arg2Type;
+            case FLOAT_DOUBLE:
+                return arg2Type.getCategory() == DBTermType.Category.INTEGER ? arg1Type : arg2Type;
+            default:
+                return arg1Type;
         }
     }
 
@@ -1363,6 +1507,51 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     protected DBFunctionSymbol createMinutesFunctionSymbol() {
         return new UnaryDBFunctionSymbolWithSerializerImpl("DB_MINUTES", rootDBType, dbIntegerType, false,
                 this::serializeMinutes);
+    }
+
+    protected DBFunctionSymbol createWeekFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_WEEK", rootDBType, dbIntegerType, false,
+                this::serializeWeek);
+    }
+
+    protected DBFunctionSymbol createQuarterFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_QUARTER", rootDBType, dbIntegerType, false,
+                this::serializeQuarter);
+    }
+
+    protected DBFunctionSymbol createDecadeFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_DECADE", rootDBType, dbIntegerType, false,
+                this::serializeDecade);
+    }
+
+    protected DBFunctionSymbol createCenturyFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_CENTURY", rootDBType, dbIntegerType, false,
+                this::serializeCentury);
+    }
+
+    protected DBFunctionSymbol createMillenniumFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_MILLENNIUM", rootDBType, dbIntegerType, false,
+                this::serializeMillennium);
+    }
+
+    protected DBFunctionSymbol createMillisecondsFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_MILLISECONDS", rootDBType, dbDecimalType, false,
+                this::serializeMilliseconds);
+    }
+
+    protected DBFunctionSymbol createMicrosecondsFunctionSymbol() {
+        return new UnaryDBFunctionSymbolWithSerializerImpl("DB_MICROSECONDS", rootDBType, dbIntegerType, false,
+                this::serializeMicroseconds);
+    }
+
+    protected DBFunctionSymbol createDateTruncFunctionSymbol() {
+        return new DBFunctionSymbolWithSerializerImpl("DB_DATE_TRUNC", ImmutableList.of(dbStringType, dbDateType), dbDateTimestampType, false,
+                this::serializeDateTrunc) {
+            @Override
+            protected boolean mayReturnNullWithoutNullArguments() {
+                return false;
+            }
+        };
     }
 
     protected DBFunctionSymbol createSecondsFunctionSymbol() {
@@ -1543,6 +1732,38 @@ public abstract class AbstractDBFunctionSymbolFactory implements DBFunctionSymbo
     protected abstract String serializeSeconds(ImmutableList<? extends ImmutableTerm> terms,
                                             Function<ImmutableTerm, String> termConverter,
                                             TermFactory termFactory);
+
+    protected abstract String serializeWeek(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeQuarter(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeDecade(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeCentury(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeMillennium(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeMilliseconds(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeMicroseconds(ImmutableList<? extends ImmutableTerm> terms,
+                                               Function<ImmutableTerm, String> termConverter,
+                                               TermFactory termFactory);
+
+    protected abstract String serializeDateTrunc(ImmutableList<? extends ImmutableTerm> terms,
+                                                    Function<ImmutableTerm, String> termConverter,
+                                                    TermFactory termFactory);
 
     protected abstract String serializeTz(ImmutableList<? extends ImmutableTerm> terms,
                                                Function<ImmutableTerm, String> termConverter,

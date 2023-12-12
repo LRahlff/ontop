@@ -167,6 +167,18 @@ public abstract class AbstractSQLDBFunctionSymbolFactory extends AbstractDBFunct
     }
 
     @Override
+    protected DBFunctionSymbol createDBStdev(DBTermType inputType, boolean isPop, boolean isDistinct) {
+        DBTermType targetType = inputType.equals(dbIntegerType) ? dbDecimalType : inputType;
+        return new NullIgnoringDBStdevFunctionSymbol(inputType, targetType, isPop, isDistinct);
+    }
+
+    @Override
+    protected DBFunctionSymbol createDBVariance(DBTermType inputType, boolean isPop, boolean isDistinct) {
+        DBTermType targetType = inputType.equals(dbIntegerType) ? dbDecimalType : inputType;
+        return new NullIgnoringDBVarianceFunctionSymbol(inputType, targetType, isPop, isDistinct);
+    }
+
+    @Override
     protected DBFunctionSymbol createDBMin(DBTermType termType) {
         return new DBMinFunctionSymbolImpl(termType);
     }
@@ -174,6 +186,11 @@ public abstract class AbstractSQLDBFunctionSymbolFactory extends AbstractDBFunct
     @Override
     protected DBFunctionSymbol createDBMax(DBTermType termType) {
         return new DBMaxFunctionSymbolImpl(termType);
+    }
+
+    @Override
+    protected DBFunctionSymbol createDBSample(DBTermType termType) {
+        return new DBSampleFunctionSymbolImpl(termType, "MIN");
     }
 
     protected static ImmutableTable<String, Integer, DBFunctionSymbol> createDefaultRegularFunctionTable(TypeFactory typeFactory) {
@@ -311,7 +328,7 @@ public abstract class AbstractSQLDBFunctionSymbolFactory extends AbstractDBFunct
                 abstractRootDBType);
         builder.put(ST_DISTANCE_SPHEROID, 3, distanceSpheroidFunctionSymbol);
 
-        DBFunctionSymbol asTextSymbol = new DefaultSQLSimpleTypedDBFunctionSymbol(ST_ASTEXT, 1, dbStringType, false,
+        DBFunctionSymbol asTextSymbol = new DefaultSQLSimpleTypedDBFunctionSymbol(ST_ASTEXT, 1, dbStringType, true,
                 abstractRootDBType);
         builder.put(ST_ASTEXT, 1, asTextSymbol);
 
@@ -362,6 +379,10 @@ public abstract class AbstractSQLDBFunctionSymbolFactory extends AbstractDBFunct
         DBFunctionSymbol setsridSymbol = new GeoDBTypedFunctionSymbol(ST_SETSRID, 2, dbStringType, false,
                 abstractRootDBType);
         builder.put(ST_SETSRID, 2, setsridSymbol);
+
+        DBFunctionSymbol transformSymbol = new GeoDBTypedFunctionSymbol(ST_TRANSFORM, 2, dbStringType, false,
+                abstractRootDBType);
+        builder.put(ST_TRANSFORM, 2, transformSymbol);
 
         DBFunctionSymbol geomfromtextSymbol = new GeoDBTypedFunctionSymbol(ST_GEOMFROMTEXT, 1, dbStringType, false,
                 abstractRootDBType);
@@ -726,6 +747,54 @@ public abstract class AbstractSQLDBFunctionSymbolFactory extends AbstractDBFunct
     protected String serializeSeconds(ImmutableList<? extends ImmutableTerm> terms,
                                       Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
         return String.format("EXTRACT(SECOND FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeWeek(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(WEEK FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeQuarter(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(QUARTER FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeDecade(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(DECADE FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeCentury(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(CENTURY FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeMillennium(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(MILLENNIUM FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeMilliseconds(ImmutableList<? extends ImmutableTerm> terms,
+                                      Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(MILLISECONDS FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeMicroseconds(ImmutableList<? extends ImmutableTerm> terms,
+                                           Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("EXTRACT(MICROSECONDS FROM %s)", termConverter.apply(terms.get(0)));
+    }
+
+    @Override
+    protected String serializeDateTrunc(ImmutableList<? extends ImmutableTerm> terms,
+                                           Function<ImmutableTerm, String> termConverter, TermFactory termFactory) {
+        return String.format("DATE_TRUNC(%s, %s)", termConverter.apply(terms.get(1)), termConverter.apply(terms.get(0)));
     }
 
     @Override

@@ -174,10 +174,7 @@ public class DuckDBDBFunctionSymbolFactory extends AbstractSQLDBFunctionSymbolFa
            However, we want the string to end with +HH:MM instead. So we split it before the last
            two characters and add a ':' in-between.
          */
-        return String.format("CONCAT(" +
-                        "LEFT(STRFTIME(CAST(%s as TIMESTAMP WITH TIME ZONE), '%%xT%%X%%z'), -2), " +
-                        "':', " +
-                        "RIGHT(STRFTIME(CAST(%s as TIMESTAMP WITH TIME ZONE), '%%xT%%X%%z'), -2))",
+        return String.format("STRFTIME(CAST(%s as TIMESTAMP WITH TIME ZONE), '%%xT%%X%%z')",
                 termConverter.apply(terms.get(0)),
                 termConverter.apply(terms.get(0)));
     }
@@ -288,5 +285,10 @@ public class DuckDBDBFunctionSymbolFactory extends AbstractSQLDBFunctionSymbolFa
                         "ELSE NULL " +
                         "END",
                 term);
+    }
+
+    @Override
+    protected DBFunctionSymbol createDBSample(DBTermType termType) {
+        return new DBSampleFunctionSymbolImpl(termType, "FIRST");
     }
 }

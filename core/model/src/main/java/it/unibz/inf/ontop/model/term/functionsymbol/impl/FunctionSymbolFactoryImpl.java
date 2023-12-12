@@ -225,6 +225,25 @@ public class FunctionSymbolFactoryImpl implements FunctionSymbolFactory {
                         xsdDatetime, xsdInteger, false, TermFactory::getDBHours),
                 new SimpleUnarySPARQLFunctionSymbolImpl("SP_MINUTES", XPathFunction.MINUTES_FROM_DATETIME,
                         xsdDatetime, xsdInteger, false, TermFactory::getDBMinutes),
+
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_WEEK", Ontop.WEEK_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBWeek),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_QUARTER", Ontop.QUARTER_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBQuarter),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_DECADE", Ontop.DECADE_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBDecade),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_CENTURY", Ontop.CENTURY_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBCentury),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_MILLENNIUM", Ontop.MILLENNIUM_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBMillennium),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_MILLISECONDS", Ontop.MILLISECONDS_FROM_DATETIME,
+                        xsdDatetime, xsdDecimal, false, TermFactory::getDBMilliseconds),
+                new SimpleUnarySPARQLFunctionSymbolImpl("SP_MICROSECONDS", Ontop.MICROSECONDS_FROM_DATETIME,
+                        xsdDatetime, xsdInteger, false, TermFactory::getDBMicroseconds),
+
+                new DateTruncSPARQLFunctionSymbolImpl(xsdDatetime,
+                        xsdString, (t) -> dbFunctionSymbolFactory.getDBDateTrunc(t)),
+
                 new SimpleUnarySPARQLFunctionSymbolImpl("SP_SECONDS", XPathFunction.SECONDS_FROM_DATETIME,
                         xsdDatetime, xsdDecimal, false, TermFactory::getDBSeconds),
                 new SimpleUnarySPARQLFunctionSymbolImpl("SP_TZ", SPARQL.TZ,
@@ -235,10 +254,16 @@ public class FunctionSymbolFactoryImpl implements FunctionSymbolFactory {
                 new CountSPARQLFunctionSymbolImpl(abstractRDFType, xsdInteger, false),
                 new CountSPARQLFunctionSymbolImpl(xsdInteger, false),
                 new SumSPARQLFunctionSymbolImpl(false, abstractRDFType),
-                new MinOrMaxSPARQLFunctionSymbolImpl(typeFactory, false),
-                new MinOrMaxSPARQLFunctionSymbolImpl(typeFactory, true),
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.MIN),
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.MAX),
                 new AvgSPARQLFunctionSymbolImpl(abstractRDFType, false),
-                new MinBasedSampleSPARQLFunctionSymbol(typeFactory),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, false, false),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, true, false),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, false),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, false, false),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, true, false),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, false),
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.SAMPLE),
                 /*
                  * Geo SF relation Functions
                  */
@@ -442,12 +467,18 @@ public class FunctionSymbolFactoryImpl implements FunctionSymbolFactory {
                 new CountSPARQLFunctionSymbolImpl(xsdInteger, true),
                 new SumSPARQLFunctionSymbolImpl(true, abstractRDFType),
                 // Distinct can be safely ignored
-                new MinOrMaxSPARQLFunctionSymbolImpl(typeFactory, false),
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.MIN),
                 // Distinct can be safely ignored
-                new MinOrMaxSPARQLFunctionSymbolImpl(typeFactory, true),
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.MIN),
                 // Distinct can be safely ignored
-                new MinBasedSampleSPARQLFunctionSymbol(typeFactory),
-                new AvgSPARQLFunctionSymbolImpl(abstractRDFType, true)
+                new MinOrMaxOrSampleSPARQLFunctionSymbolImpl(typeFactory, MinOrMaxOrSampleSPARQLFunctionSymbolImpl.MinMaxSampleType.SAMPLE),
+                new AvgSPARQLFunctionSymbolImpl(abstractRDFType, true),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, true, true),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, false, true),
+                new StdevSPARQLFunctionSymbolImpl(abstractRDFType, true),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, true, true),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, false, true),
+                new VarianceSPARQLFunctionSymbolImpl(abstractRDFType, true)
         );
 
         ImmutableTable.Builder<String, Integer, SPARQLFunctionSymbol> tableBuilder = ImmutableTable.builder();

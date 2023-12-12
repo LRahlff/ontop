@@ -14,6 +14,8 @@ import it.unibz.inf.ontop.iq.impl.IQTreeTools;
 import it.unibz.inf.ontop.iq.node.*;
 import it.unibz.inf.ontop.iq.node.normalization.ConstructionSubstitutionNormalizer;
 import it.unibz.inf.ontop.iq.node.normalization.NotRequiredVariableRemover;
+import it.unibz.inf.ontop.iq.request.FunctionalDependencies;
+import it.unibz.inf.ontop.iq.request.VariableNonRequirement;
 import it.unibz.inf.ontop.iq.transform.IQTreeExtendedTransformer;
 import it.unibz.inf.ontop.iq.transform.IQTreeVisitingTransformer;
 import it.unibz.inf.ontop.iq.node.normalization.ConstructionSubstitutionNormalizer.ConstructionSubstitutionNormalization;
@@ -26,10 +28,7 @@ import it.unibz.inf.ontop.utils.ImmutableCollectors;
 import it.unibz.inf.ontop.utils.VariableGenerator;
 import it.unibz.inf.ontop.utils.impl.VariableGeneratorImpl;
 
-import java.util.Collection;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -256,9 +255,10 @@ public class ConstructionNodeImpl extends ExtendedProjectionNodeImpl implements 
                 .collect(ImmutableCollectors.toSet());
 
         VariableNullability variableNullability = getVariableNullability(child);
+        ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap = getDeterminedByMap(variableNullability);
 
         ImmutableSet<ImmutableSet<Variable>> transformedConstraints = childConstraints.stream()
-                .flatMap(childConstraint -> extractTransformedUniqueConstraint(childConstraint, variableNullability))
+                .flatMap(childConstraint -> extractTransformedUniqueConstraint(childConstraint, determinedByMap))
                 .collect(ImmutableCollectors.toSet());
 
         return transformedConstraints.isEmpty()
@@ -270,22 +270,82 @@ public class ConstructionNodeImpl extends ExtendedProjectionNodeImpl implements 
 
     /**
      * TODO: consider variable equality?
-     *
-     * TODO: consider producing composite constraints?
-     *
      */
     private Stream<ImmutableSet<Variable>> extractTransformedUniqueConstraint(ImmutableSet<Variable> childConstraint,
-                                                                              VariableNullability variableNullability) {
-        Stream<ImmutableSet<Variable>> atomicConstraints = substitution.builder()
-                .restrictRangeTo(ImmutableFunctionalTerm.class)
-                .restrictRange(t -> isAtomicConstraint(t, childConstraint, variableNullability))
-                .build()
-                .getDomain().stream()
-                .map(ImmutableSet::of);
+                                                                              ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap) {
+        return getNewRepresentations(childConstraint, determinedByMap).stream();
+    }
 
-        Stream<ImmutableSet<Variable>> duplicatedConstraints = extractDuplicatedConstraints(childConstraint);
+    /**
+     * For each projected variable, computes the set of variables that uniquely determine it. This can happen by
+     * (i) Variable is just kept in projection                                              Set(x) -> x
+     * (ii) Variable is constructed using a function injective on a set of other variables  Y -> x where x = f(X), Y subset of X such that f is injective on Y
+     */
+    private ImmutableMap<Variable, ImmutableSet<Variable>> getDeterminedByMap(VariableNullability variableNullability) {
+        return projectedVariables.stream()
+                .collect(ImmutableCollectors.toMap(
+                        v -> v,
+                        v -> getDeterminedBy(Optional.ofNullable(substitution.get(v)).orElse(v), variableNullability)
+                ));
+    }
 
-        return Stream.concat(atomicConstraints, duplicatedConstraints);
+    private ImmutableSet<Variable> getDeterminedBy(ImmutableTerm term, VariableNullability variableNullability) {
+        if(term instanceof Variable)
+            return ImmutableSet.of((Variable)term);
+        if(!(term instanceof ImmutableFunctionalTerm))
+            return ImmutableSet.of();
+        ImmutableFunctionalTerm functionalTerm = (ImmutableFunctionalTerm) term;
+
+        VariableGenerator uselessVariableGenerator = new VariableGeneratorImpl(ImmutableSet.of(), termFactory);
+        Optional<FunctionalTermDecomposition> analysis = functionalTerm.analyzeInjectivity(ImmutableSet.of(), variableNullability, uselessVariableGenerator);
+        return analysis
+                .map(t -> t.getLiftableTerm().getVariableStream())
+                .orElse(Stream.of())
+                .filter(v -> term.getVariableStream().anyMatch(v2 -> v2.equals(v)))
+                .collect(ImmutableCollectors.toSet());
+    }
+
+    /**
+     * Finds all possible new representations of a previously holding UC after substitution.
+     * This requires us to find, for each variable in the original UC, a projected variable that is determined by it.
+     */
+    private ImmutableSet<ImmutableSet<Variable>> getNewRepresentations(ImmutableSet<Variable> previousUC, ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap) {
+        ImmutableSet.Builder<ImmutableSet<Variable>> builder = ImmutableSet.builder();
+        ImmutableSet<Variable> relatedVariables = projectedVariables.stream()
+                .filter(v -> previousUC.contains(v) || !Sets.intersection(previousUC, determinedByMap.get(v)).isEmpty())
+                .collect(ImmutableCollectors.toSet());
+
+        List<ImmutableList<Variable>> setsToCheck = relatedVariables.stream()
+                .map(ImmutableList::of)
+                .collect(Collectors.toList());
+
+        while(!setsToCheck.isEmpty()) {
+            var next = setsToCheck.remove(0);
+            if(includesAll(next, previousUC, determinedByMap)) {
+                builder.add(next.stream().collect(ImmutableCollectors.toSet()));
+                continue;
+            }
+            setsToCheck.addAll(
+                    relatedVariables.stream()
+                            .filter(v -> v.getName().compareTo(next.get(next.size() - 1).getName()) > 0) //Only test variables in alphabetical order
+                            .filter(v -> !includesAll(next, determinedByMap.get(v), determinedByMap)) //Skip variables that do not add new determinants
+                            .map(v -> Stream.concat(next.stream(), Stream.of(v)).collect(ImmutableCollectors.toList()))
+                            .collect(Collectors.toSet())
+            );
+        }
+        var result = builder.build();
+
+        return result.stream()
+                .filter(uc -> result.stream()
+                        .noneMatch(uc2 -> uc.containsAll(uc2) && !uc.equals(uc2)))
+                .collect(ImmutableCollectors.toSet());
+    }
+
+    private boolean includesAll(ImmutableList<Variable> variables, ImmutableSet<Variable> target, ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap) {
+        return variables.stream()
+                .map(determinedByMap::get)
+                .reduce(Set.of(), (result, item) -> Sets.union(result, item), (set1, set2) -> Sets.union(set1, set2))
+                .containsAll(target);
     }
 
     private boolean isAtomicConstraint(ImmutableFunctionalTerm functionalTerm, ImmutableSet<Variable> childConstraint,
@@ -326,12 +386,85 @@ public class ConstructionNodeImpl extends ExtendedProjectionNodeImpl implements 
                 .filter(projectedVariables::containsAll);
     }
 
+    @Override
+    public FunctionalDependencies inferFunctionalDependencies(IQTree child, ImmutableSet<ImmutableSet<Variable>> uniqueConstraints, ImmutableSet<Variable> variables) {
+        var childFDs = child.inferFunctionalDependencies();
+        var nullability = getVariableNullability(child);
+        ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap = getDeterminedByMap(nullability);
+        return Stream.concat(childFDs.stream(), newDependenciesFromSubstitution(nullability))
+                .flatMap(e -> translateFunctionalDependency(e.getKey(), e.getValue(), determinedByMap))
+                .collect(FunctionalDependencies.toFunctionalDependencies())
+                .concat(FunctionalDependencies.fromUniqueConstraints(uniqueConstraints, variables));
+    }
+
+
+    /**
+     * Computes the functional dependencies that can be taken from substitutions. E.g. x = F(a) ==> a -> x
+     */
+    private Stream<Map.Entry<ImmutableSet<Variable>, ImmutableSet<Variable>>> newDependenciesFromSubstitution(VariableNullability nullability) {
+        var variableToSubstitution = substitution.stream()
+                .filter(e -> isDeterministic(e.getValue()))
+                .map(e -> Maps.immutableEntry(
+                        e.getValue().getVariableStream().collect(ImmutableCollectors.toSet()),
+                        ImmutableSet.of(e.getKey())
+                ))
+                .filter(e -> !e.getKey().isEmpty());
+        var substitutionToVariable = substitution.stream()
+                .filter(e -> e.getValue() instanceof ImmutableFunctionalTerm)
+                .filter(e -> isAtomicConstraint((ImmutableFunctionalTerm) e.getValue(), ((ImmutableFunctionalTerm) e.getValue()).getVariables(), nullability))
+                .map(e -> Maps.immutableEntry(
+                        ImmutableSet.of(e.getKey()),
+                        e.getValue().getVariableStream().collect(ImmutableCollectors.toSet())
+                ))
+                .filter(e -> !e.getValue().isEmpty());
+        var renamingDependencies = getSubstitution().builder()
+                .restrictRangeTo(Variable.class)
+                .build()
+                .stream()
+                .map(entry -> Maps.immutableEntry(ImmutableSet.of(entry.getKey()), ImmutableSet.of(entry.getValue())));
+        return Streams.concat(variableToSubstitution, substitutionToVariable, renamingDependencies);
+    }
+
+    private Stream<Map.Entry<ImmutableSet<Variable>, ImmutableSet<Variable>>> translateFunctionalDependency(ImmutableSet<Variable> determinants,
+                                                                                                            ImmutableSet<Variable> dependents,
+                                                                                                            ImmutableMap<Variable, ImmutableSet<Variable>> determinedByMap) {
+        //Dependents of new FD are all projected previous dependents + new variables that only use dependent variables in their substitution (with deterministic functions).
+        var keptDependents = Sets.intersection(dependents, projectedVariables);
+        var newDependents = substitution.stream()
+                .filter(s -> dependents.containsAll(s.getValue().getVariableStream().collect(ImmutableCollectors.toSet()))
+                        && this.isDeterministic(s.getValue()))
+                .map(s -> s.getKey());
+        var allDependents = Stream.concat(keptDependents.stream(), newDependents)
+                .collect(ImmutableCollectors.toSet());
+        if(allDependents.isEmpty())
+            return Stream.of();
+
+
+        Stream<ImmutableSet<Variable>> preservedDeterminants = projectedVariables.containsAll(determinants) ? Stream.of(determinants) : Stream.of();
+        var newDeterminants = extractTransformedUniqueConstraint(determinants, determinedByMap);
+        var allDeterminants = Streams.concat(preservedDeterminants, newDeterminants);
+
+        return allDeterminants
+                .map(determinant -> Maps.immutableEntry(determinant, Sets.difference(allDependents, determinant).immutableCopy()))
+                .filter(e -> !e.getValue().isEmpty());
+    }
+
+    private boolean isDeterministic(ImmutableTerm term) {
+        if(!(term instanceof ImmutableFunctionalTerm))
+            return true;
+        ImmutableFunctionalTerm f = (ImmutableFunctionalTerm) term;
+        if(!f.getFunctionSymbol().isDeterministic())
+            return false;
+        return f.getTerms().stream()
+                .allMatch(this::isDeterministic);
+    }
+
     /**
      * For a construction node, none of the projected variables is required.
      */
     @Override
-    public ImmutableSet<Variable> computeNotInternallyRequiredVariables(IQTree child) {
-        return getVariables();
+    public VariableNonRequirement computeVariableNonRequirement(IQTree child) {
+        return VariableNonRequirement.of(getVariables());
     }
 
     @Override

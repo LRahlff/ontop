@@ -20,6 +20,8 @@ import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
@@ -89,6 +91,26 @@ public class AbstractDockerRDF4JTest {
         return count;
     }
 
+    protected void executeAndCompareValuesAny(String queryString, ImmutableList<ImmutableSet<String>> expectedVValues) {
+        executeAndCompareValuesAny(queryString, expectedVValues, new MapBindingSet());
+    }
+
+    protected void executeAndCompareValuesAny(String queryString, ImmutableList<ImmutableSet<String>> expectedVValues,
+                                              BindingSet bindings) {
+        ImmutableSet<String> vValues = ImmutableSet.copyOf(runQuery(queryString, bindings));
+        List<AssertionError> errors = new ArrayList<>();
+        for(var possibleResult : expectedVValues) {
+            try {
+                assertEquals(possibleResult, vValues);
+                return;
+            }
+            catch (AssertionError e) {
+                errors.add(e);
+            }
+        }
+        throw errors.get(0);
+    }
+
     protected void executeAndCompareValues(String queryString, ImmutableSet<String> expectedVValues) {
         executeAndCompareValues(queryString, expectedVValues, new MapBindingSet());
     }
@@ -155,10 +177,11 @@ public class AbstractDockerRDF4JTest {
                     if (((SimpleLiteral) bindingSetValue).getDatatype().stringValue().endsWith("#PlainLiteral")) {
                             vValueBuilder.add("\"" + bindingSetValue.stringValue() + "\"^^xsd:string");
                     } else {
-                    // CASE 2.2.2: xsd datatype
+                    // CASE 2.2.2: xsd datatype, or wkt literal
                             vValueBuilder.add("\"" + simpleLiteral.stringValue() + "\"" + "^^" +
                             ((SimpleLiteral) bindingSetValue).getDatatype().stringValue()
-                                    .replace("http://www.w3.org/2001/XMLSchema#", "xsd:"));
+                                    .replace("http://www.w3.org/2001/XMLSchema#", "xsd:")
+                                    .replace("http://www.opengis.net/ont/geosparql#", "geo:"));
                     }
                 }
             }

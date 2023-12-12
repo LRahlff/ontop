@@ -83,7 +83,9 @@ public class DefaultSelectFromWhereSerializer implements SelectFromWhereSerializ
                     .orElse("");
 
             String groupByString = serializeGroupBy(selectFromWhere.getGroupByVariables(), columnIDs);
-            String orderByString = serializeOrderBy(selectFromWhere.getSortConditions(), columnIDs);
+            String orderByString = serializeOrderBy(selectFromWhere.getSortConditions(),
+                    columnIDs,
+                    selectFromWhere.getOffset().isPresent() || selectFromWhere.getLimit().isPresent());
             String sliceString = serializeSlice(selectFromWhere.getLimit(), selectFromWhere.getOffset(),
                     selectFromWhere.getSortConditions().isEmpty());
 
@@ -166,6 +168,15 @@ public class DefaultSelectFromWhereSerializer implements SelectFromWhereSerializ
                     .collect(Collectors.joining(", "));
 
             return String.format("ORDER BY %s\n", conditionString);
+        }
+
+        /**
+         * By default, calls serializeOrderBy without hasOffsetOrLimit. Can be used for specific dialects that
+         * have to handle ORDER BY differently if an offset or limit is provided (e.g. SQLServer)
+         */
+        protected String serializeOrderBy(ImmutableList<SQLOrderComparator> sortConditions,
+                                          ImmutableMap<Variable, QualifiedAttributeID> columnIDs, boolean hasOffsetOrLimit) {
+            return serializeOrderBy(sortConditions, columnIDs);
         }
 
         /**
@@ -395,10 +406,13 @@ public class DefaultSelectFromWhereSerializer implements SelectFromWhereSerializ
                             v -> v.getKey(),
                             v -> new QualifiedAttributeID(idFactory.createRelationID(alias), v.getValue().getAttribute())
                     ));
+
+            var aliasFactory = createAttributeAliasFactory();
+
             var subProjection = subQuerySerialization.getColumnIDs().keySet().stream()
                     .filter(v -> variableAliases.containsKey(v))
                     .map(
-                            v -> subQuerySerialization.getColumnIDs().get(v).getSQLRendering() + " AS " + idFactory.createAttributeID(v.getName()).getSQLRendering()
+                            v -> subQuerySerialization.getColumnIDs().get(v).getSQLRendering() + " AS " + aliasFactory.createAttributeAlias(v.getName()).getSQLRendering()
                     )
                     .collect(Collectors.joining(", "));
             if(subProjection.length() > 0)

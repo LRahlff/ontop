@@ -3577,6 +3577,119 @@ public class NormalizationTest {
         normalizeAndCompare(initialIQ, initialIQ);
     }
 
+    @Test
+    public void testAggregationReducibleToDistinct1() {
+        var projectionAtom = ATOM_FACTORY.getDistinctVariableOnlyDataAtom(ATOM_FACTORY.getRDFAnswerPredicate(1), ImmutableList.of(A));
+        var dataNode1 = IQ_FACTORY.createExtensionalDataNode(UUID_TABLE1_AR3, ImmutableMap.of(0, A, 1, B));
+
+        var aggregationTree = IQ_FACTORY.createUnaryIQTree(
+                IQ_FACTORY.createAggregationNode(ImmutableSet.of(A), SUBSTITUTION_FACTORY.getSubstitution()),
+                dataNode1);
+
+        var initialIQ = IQ_FACTORY.createIQ(projectionAtom, aggregationTree);
+
+        var newDataNode1 = IQ_FACTORY.createExtensionalDataNode(UUID_TABLE1_AR3, ImmutableMap.of(0, A));
+        var newTree = IQ_FACTORY.createUnaryIQTree(
+                IQ_FACTORY.createDistinctNode(),
+                newDataNode1);
+
+        var expectedIQ = IQ_FACTORY.createIQ(projectionAtom, newTree);
+
+        normalizeAndCompare(initialIQ, expectedIQ);
+    }
+
+    @Test
+    public void testAggregationReducibleToDistinct2() {
+        var projectionAtom = ATOM_FACTORY.getDistinctVariableOnlyDataAtom(ATOM_FACTORY.getRDFAnswerPredicate(1), ImmutableList.of(A));
+        var dataNode1 = IQ_FACTORY.createExtensionalDataNode(UUID_TABLE1_AR3, ImmutableMap.of(0, A, 1, B));
+
+        var aggregationTree = IQ_FACTORY.createUnaryIQTree(
+                IQ_FACTORY.createAggregationNode(ImmutableSet.of(A), SUBSTITUTION_FACTORY.getSubstitution(C, TERM_FACTORY.getDBCount(false))),
+                dataNode1);
+
+        var constructionNode = IQ_FACTORY.createConstructionNode(projectionAtom.getVariables());
+
+        var initialIQ = IQ_FACTORY.createIQ(projectionAtom,
+                IQ_FACTORY.createUnaryIQTree(constructionNode, aggregationTree));
+
+        var newDataNode1 = IQ_FACTORY.createExtensionalDataNode(UUID_TABLE1_AR3, ImmutableMap.of(0, A));
+        var newTree = IQ_FACTORY.createUnaryIQTree(
+                IQ_FACTORY.createDistinctNode(),
+                newDataNode1);
+
+        var expectedIQ = IQ_FACTORY.createIQ(projectionAtom, newTree);
+
+        normalizeAndCompare(initialIQ, expectedIQ);
+    }
+
+    @Test
+    public void testFlattenFilterConstant() {
+
+        DistinctVariableOnlyDataAtom projectionAtom = ATOM_FACTORY.getDistinctVariableOnlyDataAtom(
+                ATOM_FACTORY.getRDFAnswerPredicate(2), X, O);
+        ConstructionNode rootNode = IQ_FACTORY.createConstructionNode(projectionAtom.getVariables());
+        ImmutableExpression O_EQ_ONE = TERM_FACTORY.getStrictEquality(O, ONE);
+        FilterNode filterNode = IQ_FACTORY.createFilterNode(TERM_FACTORY.getConjunction(
+                TERM_FACTORY.getStrictEquality(C, ONE), O_EQ_ONE));
+        FlattenNode flattenNode = IQ_FACTORY.createFlattenNode(O, N, Optional.of(C), JSON_TYPE);
+        ExtensionalDataNode dataNode = createExtensionalDataNode(TABLE2_AR2, ImmutableList.of(X, N));
+
+        IQTree flattenTree = IQ_FACTORY.createUnaryIQTree(flattenNode, dataNode);
+
+        IQ initialIQ = IQ_FACTORY.createIQ(projectionAtom,
+                IQ_FACTORY.createUnaryIQTree(
+                        rootNode,
+                        IQ_FACTORY.createUnaryIQTree(
+                                filterNode,
+                                flattenTree)));
+
+        normalizeAndCompare(initialIQ, initialIQ);
+    }
+
+    @Test
+    public void testFlattenDescendingConstant() {
+
+        DistinctVariableOnlyDataAtom projectionAtom = ATOM_FACTORY.getDistinctVariableOnlyDataAtom(
+                ATOM_FACTORY.getRDFAnswerPredicate(3), X, C, O);
+        ConstructionNode rootNode = IQ_FACTORY.createConstructionNode(projectionAtom.getVariables());
+        InnerJoinNode joinNode = IQ_FACTORY.createInnerJoinNode();
+        FlattenNode flattenNode = IQ_FACTORY.createFlattenNode(O, N, Optional.of(C), JSON_TYPE);
+        ExtensionalDataNode dataNode = createExtensionalDataNode(TABLE2_AR2, ImmutableList.of(X, N));
+
+        IQTree flattenTree = IQ_FACTORY.createUnaryIQTree(flattenNode, dataNode);
+
+        IQTree rightChild = IQ_FACTORY.createUnaryIQTree(
+                IQ_FACTORY.createConstructionNode(ImmutableSet.of(C), SUBSTITUTION_FACTORY.getSubstitution(
+                        C, ONE)),
+                        IQ_FACTORY.createTrueNode());
+
+        IQ initialIQ = IQ_FACTORY.createIQ(projectionAtom,
+                IQ_FACTORY.createUnaryIQTree(
+                        rootNode,
+                        IQ_FACTORY.createNaryIQTree(
+                                joinNode,
+                                ImmutableList.of(flattenTree, rightChild))));
+
+        ConstructionNode newRootNode = IQ_FACTORY.createConstructionNode(projectionAtom.getVariables(),
+                SUBSTITUTION_FACTORY.getSubstitution(
+                        C, ONE));
+
+        FilterNode filterNode = IQ_FACTORY.createFilterNode(TERM_FACTORY.getStrictEquality(CF0, ONE));
+        FlattenNode newFlattenNode = IQ_FACTORY.createFlattenNode(O, N, Optional.of(CF0), JSON_TYPE);
+
+        IQ expectedIQ = IQ_FACTORY.createIQ(projectionAtom,
+                IQ_FACTORY.createUnaryIQTree(
+                        newRootNode,
+                        IQ_FACTORY.createUnaryIQTree(
+                                filterNode,
+                                IQ_FACTORY.createUnaryIQTree(
+                                        newFlattenNode,
+                                        dataNode))));
+
+        normalizeAndCompare(initialIQ, expectedIQ);
+    }
+
+
 
     private static void normalizeAndCompare(IQ initialIQ, IQ expectedIQ) {
         System.out.println("Initial IQ: " + initialIQ );

@@ -104,6 +104,10 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
         // Does nothing
     }
 
+    protected OntopOBDASettings getSettings() {
+        return settings;
+    }
+
 
     protected boolean isRelationExcluded(RelationID id) { return false; }
 
@@ -117,7 +121,7 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
             ImmutableList.Builder<RelationID> builder = ImmutableList.builder();
             while (rs.next()) {
                 RelationID id = getRelationID(rs, "TABLE_CAT", "TABLE_SCHEM","TABLE_NAME");
-                if (!isRelationExcluded(id))
+                if (!isRelationExcluded(id) || settings.exposeSystemTables())
                     builder.add(id);
             }
             return builder.build();
@@ -221,10 +225,31 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
 
     protected boolean isPrimaryKeyDisabled(RelationID id, String primaryKeyId) { return false; }
 
+    /**
+     * Returns a result set with the following columns
+     *     TABLE_CAT
+     *     TABLE_SCHEM
+     *     TABLE_NAME
+     *     PK_NAME
+     *     COLUMN_NAME
+     *     KEY_SEQ
+     *
+     *
+     * @param catalog
+     * @param schema
+     * @param name
+     * @return
+     * @throws SQLException
+     */
+
+    protected ResultSet getPrimaryKeysResultSet(String catalog, String schema, String name) throws SQLException {
+        return metadata.getPrimaryKeys(catalog, schema, name);
+    }
+
     private void insertPrimaryKey(NamedRelationDefinition relation) throws MetadataExtractionException, SQLException {
         RelationID id = getCanonicalRelationId(relation.getID());
         // Retrieves a description of the given table's primary key columns. They are ordered by COLUMN_NAME (sic!)
-        try (ResultSet rs = metadata.getPrimaryKeys(getRelationCatalog(id), getRelationSchema(id), getRelationName(id))) {
+        try (ResultSet rs = getPrimaryKeysResultSet(getRelationCatalog(id), getRelationSchema(id), getRelationName(id))) {
             Map<Integer, QuotedID> primaryKeyAttributes = new HashMap<>();
             String currentPkName = null;
             while (rs.next()) {
@@ -261,10 +286,31 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
 
     protected boolean isUniqueConstraintDisabled(RelationID id, String constraintId) { return false; }
 
+    /**
+     *      TABLE_CAT
+     *      TABLE_SCHEM
+     *      TABLE_NAME
+     *      TYPE = 0
+     *      NON_UNIQUE = FALSE
+     *      INDEX_NAME
+     *      COLUMN_NAME
+     *      ORDINAL_POSITION
+     *
+     * @param catalog
+     * @param schema
+     * @param name
+     * @return
+     * @throws SQLException
+     */
+
+    protected ResultSet getIndexInfo(String catalog, String schema, String name) throws SQLException {
+        return metadata.getIndexInfo(catalog, schema, name, true, true);
+    }
+
     private void insertUniqueAttributes(NamedRelationDefinition relation) throws MetadataExtractionException, SQLException {
         RelationID id = getCanonicalRelationId(relation.getID());
         // extracting unique
-        try (ResultSet rs = metadata.getIndexInfo(getRelationCatalog(id), getRelationSchema(id), getRelationName(id), true, true)) {
+        try (ResultSet rs = getIndexInfo(getRelationCatalog(id), getRelationSchema(id), getRelationName(id))) {
             UniqueConstraint.Builder builder = null;
             List<String> columnsNotFound = new ArrayList<>();
             String constraintId = null;
@@ -335,9 +381,32 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
 
     protected boolean isForeignKeyDisabled(RelationID id, String constraintId) { return false; }
 
+    /**
+     *      FKTABLE_CAT
+     *      FKTABLE_SCHEM
+     *      FKTABLE_SCHEM
+     *      PKTABLE_CAT
+     *      PKTABLE_SCHEM
+     *      PKTABLE_NAME
+     *      KEY_SEQ
+     *      FK_NAME
+     *      FKCOLUMN_NAME
+     *      PKCOLUMN_NAME
+     *
+     * @param catalog
+     * @param schema
+     * @param name
+     * @return
+     * @throws SQLException
+     */
+
+    protected ResultSet getImportedKeys(String catalog, String schema, String name) throws SQLException {
+        return metadata.getImportedKeys(catalog, schema, name);
+    }
+
     private void insertForeignKeys(NamedRelationDefinition relation, MetadataLookup dbMetadata) throws MetadataExtractionException, SQLException {
         RelationID id = getCanonicalRelationId(relation.getID());
-        try (ResultSet rs = metadata.getImportedKeys(getRelationCatalog(id), getRelationSchema(id), getRelationName(id))) {
+        try (ResultSet rs = getImportedKeys(getRelationCatalog(id), getRelationSchema(id), getRelationName(id))) {
             ForeignKeyConstraint.Builder builder = null;
             String constraintId = null;
             while (rs.next()) {
@@ -479,7 +548,7 @@ public abstract class AbstractDBMetadataProvider implements DBMetadataProvider {
         return e.getCause().toString();
     }
 
-    protected abstract RelationID getCanonicalRelationId(RelationID id);
+    protected abstract RelationID getCanonicalRelationId(RelationID id) throws MetadataExtractionException;
 
     protected abstract ImmutableList<RelationID> getAllIDs(RelationID id);
 

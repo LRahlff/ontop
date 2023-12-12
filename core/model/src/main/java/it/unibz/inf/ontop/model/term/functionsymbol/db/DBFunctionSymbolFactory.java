@@ -5,7 +5,6 @@ import it.unibz.inf.ontop.model.template.Template;
 import it.unibz.inf.ontop.model.term.functionsymbol.FunctionSymbol;
 import it.unibz.inf.ontop.model.term.functionsymbol.InequalityLabel;
 import it.unibz.inf.ontop.model.type.DBTermType;
-import it.unibz.inf.ontop.model.type.GenericDBTermType;
 import it.unibz.inf.ontop.model.type.RDFTermType;
 import org.apache.commons.rdf.api.IRI;
 
@@ -223,6 +222,8 @@ public interface DBFunctionSymbolFactory {
 
     DBMathBinaryOperator getDBMathBinaryOperator(String dbMathOperatorName, DBTermType dbNumericType);
 
+    DBMathBinaryOperator getDBMathBinaryOperator(String dbMathOperatorName, DBTermType arg1Type, DBTermType arg2Type);
+
     /**
      * Please use getDBMathBinaryOperator(...) if you know the type
      */
@@ -300,8 +301,21 @@ public interface DBFunctionSymbolFactory {
      */
     DBFunctionSymbol getNullIgnoringDBAvg(DBTermType dbType, boolean isDistinct);
 
+    /**
+     * Ignores nulls.
+     * Returns NULL if the bag/set does not contain any non-null value.
+     */
+    DBFunctionSymbol getNullIgnoringDBStdev(DBTermType dbType, boolean isPop, boolean isDistinct);
+
+    /**
+     * Ignores nulls.
+     * Returns NULL if the bag/set does not contain any non-null value.
+     */
+    DBFunctionSymbol getNullIgnoringDBVariance(DBTermType dbType, boolean isPop, boolean isDistinct);
+
     DBFunctionSymbol getDBMin(DBTermType dbType);
     DBFunctionSymbol getDBMax(DBTermType dbType);
+    DBFunctionSymbol getDBSample(DBTermType dbType);
 
     DBFunctionSymbol getNullIgnoringDBGroupConcat(boolean isDistinct);
 
@@ -391,4 +405,14 @@ public interface DBFunctionSymbolFactory {
     DBFunctionSymbol checkAndConvertDateFromDatetime();
     DBFunctionSymbol checkAndConvertDateFromString();
 
+
+    DBFunctionSymbol getDBWeek();
+    DBFunctionSymbol getDBQuarter();
+    DBFunctionSymbol getDBDecade();
+    DBFunctionSymbol getDBCentury();
+    DBFunctionSymbol getDBMillennium();
+    DBFunctionSymbol getDBMilliseconds();
+    DBFunctionSymbol getDBMicroseconds();
+
+    DBFunctionSymbol getDBDateTrunc(String datePart);
 }
