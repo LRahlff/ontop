@@ -68,7 +68,7 @@ public class OntopTupleQuery extends AbstractOntopQuery<ParsedTupleQuery> implem
 				long prepare_start = System.currentTimeMillis();
 
 				SQLQuestStatement stmt = null;
-				if (stm instanceof SQLQuestStatement && lastline.length() > 0) {
+				if (stm instanceof SQLQuestStatement && !lastline.isEmpty()) {
 					String command = lastline.replaceAll("'", "''");
 					stmt = (SQLQuestStatement) stm;
 					stmt.executeSQL("SELECT create_temp_tables('" + command + "');");
